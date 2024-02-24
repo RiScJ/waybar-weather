@@ -1,0 +1,5 @@
+"custom/weather": {
+	"exec": "/home/<USER>/.config/waybar/weather.py",
+	"interval": 300,
+	"return-type": "json"
+}
