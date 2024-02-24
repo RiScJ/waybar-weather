@@ -137,7 +137,7 @@ def render_minutely_precip_chart(resp):
         precip = resp['minutely'][minute]['precipitation']
         precip = math.ceil(precip)
         precip = 8 if precip > 8 else precip
-        precip = random.randint(0, 8)
+#        precip = random.randint(0, 8)
         chart = chart + icons[precip]
     return chart
 
@@ -145,7 +145,7 @@ def format_precip_chart_string(chart, resp):
     total_precip = 0
     for minute in range(60):
         total_precip = total_precip + resp['minutely'][minute]['precipitation']
-    total_precip = 1
+#    total_precip = 1
     if total_precip == 0:
         return ""
     else:
