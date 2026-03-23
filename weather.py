@@ -645,13 +645,132 @@ def render_alerts(alerts):
     return "\n\n".join(blocks) + "\n\n"
 
 
+def build_test_owm_data():
+    now = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
+    now_ts = int(now.timestamp())
+
+    # Simulated next-60-minute precipitation profile.
+    minutely = []
+    pattern = (
+        [0] * 8
+        + [1] * 6
+        + [2] * 8
+        + [4] * 8
+        + [6] * 8
+        + [4] * 6
+        + [2] * 8
+        + [1] * 4
+        + [0] * 4
+    )
+    pattern = pattern[:60]
+    for i, p in enumerate(pattern):
+        minutely.append({
+            "dt": now_ts + i * 60,
+            "precipitation": p,
+        })
+
+    # Simulated hourly forecast
+    hourly = []
+    hourly_jbn = [
+        JBN_ICONS["cloud"],
+        JBN_ICONS["cloud"],
+        JBN_ICONS["cloud-rain"],
+        JBN_ICONS["cloud-rain"],
+        JBN_ICONS["cloud-showers-heavy"],
+        JBN_ICONS["cloud-rain"],
+        JBN_ICONS["cloud"],
+        JBN_ICONS["cloud-moon"],
+        JBN_ICONS["moon"],
+        JBN_ICONS["moon"],
+        JBN_ICONS["cloud-moon"],
+        JBN_ICONS["cloud-moon-rain"],
+        JBN_ICONS["cloud-rain"],
+        JBN_ICONS["cloud"],
+        JBN_ICONS["cloud-sun"],
+        JBN_ICONS["sun"],
+    ]
+
+    temps = [48, 47, 46, 45, 44, 43, 42, 40, 39, 38, 39, 41, 44, 47, 50, 53]
+
+    for i in range(16):
+        hourly.append({
+            "dt": now + datetime.timedelta(hours=i),
+            "temp": temps[i],
+            "icon": hourly_jbn[i],
+        })
+
+    # Simulated daily forecast
+    daily = []
+    daily_specs = [
+        ("sun", 41, 58, 0.05),
+        ("cloud-sun", 43, 61, 0.15),
+        ("cloud", 45, 63, 0.25),
+        ("cloud-rain", 49, 60, 0.70),
+        ("cloud-showers-heavy", 50, 57, 0.90),
+        ("cloud-rain", 46, 54, 0.65),
+        ("cloud", 39, 51, 0.20),
+        ("sun", 37, 55, 0.00),
+    ]
+
+    for i, (icon_name, tmin, tmax, pop) in enumerate(daily_specs):
+        daily.append({
+            "dt": now + datetime.timedelta(days=i),
+            "temp_min": tmin,
+            "temp_max": tmax,
+            "pop": pop,
+            "icon": FA_ICONS[icon_name],
+        })
+
+    alerts = [
+        {
+            "title": "National Weather Service: Wind Advisory",
+            "time": "Today 14:00 → Today 23:00",
+            "description": (
+                "Southwest winds 20 to 30 mph with gusts up to 50 mph expected.\n"
+                "Loose outdoor objects may be blown around. Tree limbs could be blown down."
+            ),
+        },
+        {
+            "title": "National Weather Service: Flood Watch",
+            "time": "Tonight 21:00 → Tomorrow 10:00",
+            "description": (
+                "Periods of heavy rainfall may lead to localized flooding in low-lying areas.\n"
+                "Monitor later forecasts and be prepared to take action if warnings are issued."
+            ),
+        },
+    ]
+
+    return {
+        "backend": "owm",
+        "units": "imperial",
+        "current_temp": 51,
+        "current_desc": "light rain",
+        "current_icon": FA_ICONS["cloud-rain"],
+        "current_class": "500",
+        "hourly": hourly,
+        "daily": daily,
+        "minutely": minutely,
+        "alerts": alerts,
+    }
+
+
+def debug_dump_test_tooltip():
+    data = build_test_owm_data()
+    out = {
+        "text": f"{data['current_icon']} {round(data['current_temp'])} {temp_unit_symbol(data['units'])}",
+        "class": data["current_class"],
+        "alt": data["current_desc"],
+        "tooltip": make_tooltip(data),
+    }
+    print(json.dumps(out))
+
+
 def make_tooltip(data):
     header = (
         f"<span font_family=\"{FA_FONT}\" size=\"{HEADER_ICON_SIZE}\">{data['current_icon']}</span>  "
         f"<span font_family=\"{MONO_FONT}\" size=\"{HEADER_SIZE}\">{data['current_desc']}</span>"
     )
     precip_block = render_minutely_precip_chart(data.get("minutely", [])) if data.get("backend") == "owm" else ""
-    alerts_block = render_alerts(data.get("alerts", [])) if data.get("backend") == "owm" else ""
     hourly_block = (
         " " + render_hourly_hours(data["hourly"]) + " "
         + "\n"
@@ -660,18 +779,24 @@ def make_tooltip(data):
         + " " + render_hourly_temps(data["hourly"]) + " "
     )
     daily_block = render_daily_rows(data["daily"])
+    alerts_block = render_alerts(data.get("alerts", [])) if data.get("backend") == "owm" else ""
 
     parts = [header, ""]
     if precip_block:
         parts.extend([precip_block.rstrip("\n"), ""])
-    if alerts_block:
-        parts.extend([alerts_block.rstrip("\n"), ""])
     parts.extend([hourly_block, "", daily_block])
+    if alerts_block:
+        parts.extend(["", alerts_block.rstrip("\n"), ""])
 
     return "\n".join(parts)
 
 
 def main():
+    debug = os.getenv("WEATHER_DEBUG_OWM", "0") == "1"
+    if debug:
+        debug_dump_test_tooltip()
+        return
+
     cfg = load_config()
     data = fetch_weather(cfg)
     unit_symbol = temp_unit_symbol(data["units"])
