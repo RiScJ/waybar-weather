@@ -35,3 +35,4 @@ git pull origin master
 * Minutely precipitation chart shown for the next hour if there is any forecasted (only available with OWM backend)
 * Hourly temperatures and status icons for the next sixteen hours
 * Daily status icons, probability of precipitation, and temperature graph for the next eight days
+* Weather alert texts (only available with OWM backend)
