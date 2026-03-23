@@ -8,7 +8,7 @@ Demonstration of weather module.
 Demonstration of weather module showing precipitation chart for the next hour (simulated data).
 
 ## Requirements
-This module uses "Font Awesome 5 Free" for the current weather icon and the daily chart icons, "JetBrainsMono Nerd Font Mono" for the hourly chart icons, and "Fantasque Sans Mono" for text. If you want to change the text font, be prepared to have to fine-tune the space paddings on the daily chart icons. Of course, it also requires you to be using Waybar. 
+This module uses "Font Awesome 6 Free Solid" for the current weather icon and the daily chart icons, "JetBrainsMono Nerd Font Mono" for the hourly chart icons, and "Fantasque Sans Mono" for text. If you want to change the text font, be prepared to have to fine-tune the space paddings on the daily chart icons. Of course, it also requires you to be using Waybar. 
 
 ## Installation
 ```
