@@ -89,7 +89,8 @@ NERD_FONT = "JetBrainsMono Nerd Font Mono"
 FA_FONT = "Font Awesome 6 Free Solid"
 MONO_FONT = "Fantasque Sans Mono"
 
-HEADER_SIZE = "xx-large"
+HEADER_SIZE = "24pt"
+HEADER_ICON_SIZE = "24pt"
 HOURLY_SIZE = "small"
 DAILY_SIZE = "large"
 
@@ -357,7 +358,7 @@ def normalize_from_owm(resp, units):
     sunset = int(today["sunset"])
     current_is_day = sunrise <= current_ts < sunset
 
-    current_icon = decode_icon_owm_jbn(current_code, current_is_day)
+    current_icon = decode_icon_owm_fa(current_code, current_is_day)
     current_temp = float(resp["current"]["temp"])
 
     hourly = []
@@ -415,7 +416,7 @@ def normalize_from_meteo(resp, units):
     current_code = int(current["weather_code"])
     current_is_day = bool(int(current.get("is_day", 1)))
     current_desc = WMO_DESCRIPTIONS.get(current_code, "weather")
-    current_icon = decode_icon_wmo_jbn(current_code, current_is_day)
+    current_icon = decode_icon_wmo_fa(current_code, current_is_day)
 
     hourly = []
     for i in range(min(16, len(hourly_src["time"]))):
@@ -523,7 +524,7 @@ def compute_daily_minmax(daily):
     return dmin, dmax
 
 
-def render_daily_bar(day_min, day_max, dlow, dhigh, steps=20):
+def render_daily_bar(day_min, day_max, dlow, dhigh, steps=18):
     delta = dhigh - dlow
     incr = delta / steps if delta != 0 else 1
     startc = int((day_min - dlow) / incr)
@@ -579,7 +580,7 @@ def render_daily_rows(daily):
     dlow, dhigh = compute_daily_minmax(daily)
     rows = []
     for day in daily[:8]:
-        dt = day["dt"].strftime("%a %d")
+        dt = day["dt"].strftime("%a %b %d")
         pop = format_pop(day["pop"])
         lt = format_temp(day["temp_min"])
         ht = format_temp(day["temp_max"])
@@ -645,7 +646,10 @@ def render_alerts(alerts):
 
 
 def make_tooltip(data):
-    header = span(f"{data['current_icon']} {data['current_desc']}", HEADER_SIZE)
+    header = (
+        f"<span font_family=\"{FA_FONT}\" size=\"{HEADER_ICON_SIZE}\">{data['current_icon']}</span>  "
+        f"<span font_family=\"{MONO_FONT}\" size=\"{HEADER_SIZE}\">{data['current_desc']}</span>"
+    )
     precip_block = render_minutely_precip_chart(data.get("minutely", [])) if data.get("backend") == "owm" else ""
     alerts_block = render_alerts(data.get("alerts", [])) if data.get("backend") == "owm" else ""
     hourly_block = (
