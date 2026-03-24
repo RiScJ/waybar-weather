@@ -91,8 +91,8 @@ MONO_FONT = "Fantasque Sans Mono"
 
 HEADER_SIZE = "24pt"
 HEADER_ICON_SIZE = "24pt"
-HOURLY_SIZE = "small"
-DAILY_SIZE = "large"
+HOURLY_SIZE = "12pt"
+DAILY_SIZE = "16pt"
 
 
 def fail_waybar(text: str, tooltip: str | None = None, class_name: str = "error") -> None:
@@ -103,6 +103,10 @@ def fail_waybar(text: str, tooltip: str | None = None, class_name: str = "error"
         "tooltip": tooltip if tooltip is not None else text,
     }))
     sys.exit(0)
+
+
+def vspace(size="8pt"):
+    return f"<span color=\"black\" size=\"{size}\"> </span>"
 
 
 def validate_latitude(lat):
@@ -135,46 +139,79 @@ def load_config():
     try:
         with open(config_file, "r", encoding="utf-8") as file:
             for raw_line in file:
-                line = raw_line.strip()
-                if not line or line.startswith("#"):
+                line = raw_line.split("#", 1)[0].strip()
+                if not line:
                     continue
+
                 if "=" not in line:
                     fail_waybar("weather err", f"Invalid config line: {line}")
+
                 key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip()
+
                 if key == "lat":
                     if not validate_latitude(value):
                         fail_waybar("weather err", "Invalid latitude")
+
                 elif key == "lon":
                     if not validate_longitude(value):
                         fail_waybar("weather err", "Invalid longitude")
+
                 elif key == "units":
                     if not validate_units(value):
                         fail_waybar("weather err", "Invalid units")
+
                 elif key == "backend":
                     if not validate_backend(value):
                         fail_waybar("weather err", "Invalid backend")
+
                 elif key == "appid":
                     pass
+
+                elif key == "widthguard":
+                    pass
+
+                elif key == "guardcolor":
+                    pass
+
                 else:
                     fail_waybar("weather err", f"Unknown key '{key}'")
+
                 cfg[key] = value
+
     except FileNotFoundError:
         fail_waybar("weather err", f"File '{config_file}' not found")
 
     cfg.setdefault("backend", "owm")
     cfg.setdefault("units", "metric")
+    cfg.setdefault("widthguard", "")
+    cfg.setdefault("guardcolor", "black")
 
     if "lat" not in cfg or "lon" not in cfg:
         fail_waybar("weather err", "weather.conf must include lat and lon")
+
     if cfg["backend"] == "owm" and not cfg.get("appid"):
         fail_waybar("weather err", "backend=owm requires appid")
-    return cfg
 
+    return cfg
+    
+
+def get_widthguard(cfg):
+    val = cfg.get("widthguard", "").strip()
+
+    if val == "":
+        return None
+
+    try:
+        n = int(val)
+        return max(0, n)
+    except ValueError:
+        return None
+    
 
 def http_get_json(url: str):
-    req = urllib.request.Request(url, headers={"User-Agent": "waybar-weather/nerd-font"})
+    req = urllib.request.Request(url, headers={"User-Agent": "waybar-weather"})
     with urllib.request.urlopen(req, timeout=20) as response:
         return json.load(response)
 
@@ -418,14 +455,24 @@ def normalize_from_meteo(resp, units):
     current_desc = WMO_DESCRIPTIONS.get(current_code, "weather")
     current_icon = decode_icon_wmo_fa(current_code, current_is_day)
 
+    current_dt = iso_to_local_dt(current["time"])
+
+    hourly_times = hourly_src["time"]
+    start_idx = 0
+    for i, t in enumerate(hourly_times):
+        if iso_to_local_dt(t) >= current_dt.replace(minute=0, second=0, microsecond=0):
+            start_idx = i
+            break
+
     hourly = []
-    for i in range(min(16, len(hourly_src["time"]))):
+    end_idx = min(start_idx + 16, len(hourly_times))
+    for i in range(start_idx, end_idx):
         dt = iso_to_local_dt(hourly_src["time"][i])
         code = int(hourly_src["weather_code"][i])
         temp = float(hourly_src["temperature_2m"][i])
         if units == "standard":
             temp = kelvin_from_c(temp)
-        is_day = bool(int(hourly_src.get("is_day", [1] * len(hourly_src["time"]))[i]))
+        is_day = bool(int(hourly_src.get("is_day", [1] * len(hourly_times))[i]))
         hourly.append({
             "dt": dt,
             "temp": temp,
@@ -462,7 +509,6 @@ def normalize_from_meteo(resp, units):
         "minutely": [],
         "alerts": [],
     }
-
 
 def fetch_weather(cfg):
     backend = cfg["backend"].lower()
@@ -538,7 +584,7 @@ def render_daily_bar(day_min, day_max, dlow, dhigh, steps=18):
 
 
 def big_daily_icon(icon):
-    return f"<span font_family=\"{FA_FONT}\" size=\"large\" rise=\"-2pt\">{icon}</span>"
+    return f"<span font_family=\"{FA_FONT}\" size=\"16pt\" rise=\"-2pt\">{icon}</span>"
 
 
 def __align_test__render_daily_rows(daily):
@@ -568,7 +614,7 @@ def __align_test__render_daily_rows(daily):
         rows.append(
             span(
                 f"AAA {big_daily_icon(icon)} BBB | {name}",
-                "x-large",
+                "18pt",
                 MONO_FONT,
             )
         )
@@ -585,7 +631,7 @@ def render_daily_rows(daily):
         lt = format_temp(day["temp_min"])
         ht = format_temp(day["temp_max"])
         bar = render_daily_bar(day["temp_min"], day["temp_max"], dlow, dhigh)
-        rows.append(span(f"{dt} {big_daily_icon(day['icon'])} {pop} {lt} {bar} {ht}", "x-large", MONO_FONT))
+        rows.append(span(f"{dt} {big_daily_icon(day['icon'])} {pop} {lt} {bar} {ht}", "18pt", MONO_FONT))
     return "\n".join(rows)
 
 
@@ -765,12 +811,27 @@ def debug_dump_test_tooltip():
     print(json.dumps(out))
 
 
-def make_tooltip(data):
+def tooltip_width_guard(chars=60, size="12pt", color="black"):
+    return (
+        f"<span font_family=\"{MONO_FONT}\" "
+        f"size=\"{size}\" "
+        f"color=\"{color}\">"
+        f"{'─' * chars}"
+        f"</span>"
+    )
+
+
+def make_tooltip(data, cfg):
+    wg = get_widthguard(cfg)
+    guard_color = (cfg.get("guardcolor") or "black").strip()
+
     header = (
         f"<span font_family=\"{FA_FONT}\" size=\"{HEADER_ICON_SIZE}\">{data['current_icon']}</span>  "
         f"<span font_family=\"{MONO_FONT}\" size=\"{HEADER_SIZE}\">{data['current_desc']}</span>"
     )
+
     precip_block = render_minutely_precip_chart(data.get("minutely", [])) if data.get("backend") == "owm" else ""
+
     hourly_block = (
         " " + render_hourly_hours(data["hourly"]) + " "
         + "\n"
@@ -778,15 +839,24 @@ def make_tooltip(data):
         + "\n"
         + " " + render_hourly_temps(data["hourly"]) + " "
     )
+
     daily_block = render_daily_rows(data["daily"])
     alerts_block = render_alerts(data.get("alerts", [])) if data.get("backend") == "owm" else ""
 
-    parts = [header, ""]
+    parts = [header]
+
+    if wg is None:
+        parts.append(vspace("10pt"))
+    else:
+        parts.append(tooltip_width_guard(chars=wg, color=guard_color))
+
     if precip_block:
-        parts.extend([precip_block.rstrip("\n"), ""])
-    parts.extend([hourly_block, "", daily_block])
+        parts.extend([precip_block.rstrip("\n"), vspace("10pt")])
+
+    parts.extend([hourly_block, vspace("10pt"), daily_block])
+
     if alerts_block:
-        parts.extend(["", alerts_block.rstrip("\n"), ""])
+        parts.extend([vspace("10pt"), alerts_block.rstrip("\n")])
 
     return "\n".join(parts)
 
@@ -804,7 +874,7 @@ def main():
         "text": f"{data['current_icon']} {round(data['current_temp'])} {unit_symbol}",
         "class": data["current_class"],
         "alt": data["current_desc"],
-        "tooltip": make_tooltip(data),
+        "tooltip": make_tooltip(data, cfg),
     }
     print(json.dumps(out))
 
