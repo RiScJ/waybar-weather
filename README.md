@@ -18,7 +18,7 @@ git clone https://github.com/RiScJ/waybar-weather
 
 See ```module-config``` for an example of how to include the module into your Waybar config file. 
 
-See ```style.css``` for the single required styling rule for your Waybar style file. 
+See ```style.css``` for the single required styling rule for your Waybar style file. If you want to change the font-size value, you may have to add widthguarding. See the comments in the weather.conf template for details.
 
 You will need to edit ```weather.conf``` to add your latitude, longitude, choice of units (metric/standard/imperial), and a choice of backend data provider (owm/meteo). 
 
